@@ -3,8 +3,14 @@ name: iOS · Build and test
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag (e.g. v0.3.1). Leave empty to build without releasing.'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -80,3 +86,45 @@ jobs:
           name: iPhone-test-results
           path: build/Tests.xcresult
           if-no-files-found: ignore
+
+  release:
+    name: Publish the unsigned IPA as a GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Scan4Learn-unsigned-needs-signing
+          path: dist
+      - name: Name the release files
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION="$REF_NAME"
+          if [[ "$VERSION" != v* ]]; then
+            VERSION="$INPUT_VERSION"
+          fi
+          case "$VERSION" in
+            v*) ;;
+            *) echo "No release version for this run; skipping." >&2; exit 1 ;;
+          esac
+          mv "dist/Scan4Learn-unsigned.ipa" "dist/Scan4Learn-$VERSION.ipa"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$VERSION" \
+            --title "Scan4Learn $VERSION" \
+            --generate-notes \
+            --target "$GITHUB_SHA" \
+            "dist/Scan4Learn-$VERSION.ipa" \
+            "dist/Scan4Learn-iPhone.png"

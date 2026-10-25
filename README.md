@@ -56,7 +56,21 @@ The **iOS · Build and test** workflow runs on every push to `main`, every PR, a
 3. Boots the app and captures a real screenshot.
 4. Archives an **unsigned IPA** and uploads it with the screenshot as the `Scan4Learn-unsigned-needs-signing` artifact.
 
-The unsigned IPA must be signed before installation — [SideStore](https://sidestore.io/) works well and needs no Apple certificate in the repository.
+## Releases
+
+Every tagged build is published automatically:
+
+1. Push a tag (or run the workflow manually with a version input):
+
+   ```sh
+   git tag v0.3.0 && git push origin v0.3.0
+   ```
+
+2. Once CI passes, a GitHub release appears on the [Releases page](https://github.com/doleanhdepzai140123/Scan4Learn/releases) containing:
+   - `Scan4Learn-<version>.ipa` — the unsigned app archive,
+   - `Scan4Learn-iPhone.png` — a screenshot of the app running on the simulator.
+
+**The IPA is unsigned and cannot be installed directly.** Sign it with [SideStore](https://sidestore.io/) (or any signing tool) first — no Apple certificate ever needs to live in this repository.
 
 ## How the ChatGPT integration works
 
