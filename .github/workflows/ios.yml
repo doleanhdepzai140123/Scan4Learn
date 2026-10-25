@@ -1,0 +1,82 @@
+name: iOS · Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Xcode and generate project
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          brew install xcodegen
+          xcodegen generate
+          mkdir -p build
+      - name: Select a single-display iPhone simulator on iOS 27
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available --json > build/devices.json
+          python3 scripts/select_simulator.py build/devices.json >> "$GITHUB_ENV"
+      - name: Run unit tests on iPhone
+        run: |
+          set -euo pipefail
+          xcrun simctl boot "$SIMULATOR_ID" || true
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          xcodebuild test \
+            -project Scan4Learn.xcodeproj -scheme Scan4Learn \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -parallel-testing-enabled NO \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/Tests.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Capture the app on iPhone
+        run: |
+          set -euo pipefail
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          xcrun simctl status_bar "$SIMULATOR_ID" override --time '9:41' --batteryState charged --batteryLevel 100
+          xcrun simctl install "$SIMULATOR_ID" build/DerivedData/Build/Products/Debug-iphonesimulator/Scan4Learn.app
+          xcrun simctl launch "$SIMULATOR_ID" com.scan4learn.personal
+          sleep 4
+          xcrun simctl io "$SIMULATOR_ID" screenshot build/Scan4Learn-iPhone.png
+      - name: Archive unsigned device app
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project Scan4Learn.xcodeproj -scheme Scan4Learn -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Scan4Learn.xcarchive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+          mkdir -p build/unsigned/Payload
+          ditto build/Scan4Learn.xcarchive/Products/Applications/Scan4Learn.app build/unsigned/Payload/Scan4Learn.app
+          cd build/unsigned
+          ditto -c -k --keepParent Payload ../Scan4Learn-unsigned.ipa
+      - name: Upload unsigned IPA and screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: Scan4Learn-unsigned-needs-signing
+          path: |
+            build/Scan4Learn-unsigned.ipa
+            build/Scan4Learn-iPhone.png
+          if-no-files-found: error
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhone-test-results
+          path: build/Tests.xcresult
+          if-no-files-found: ignore

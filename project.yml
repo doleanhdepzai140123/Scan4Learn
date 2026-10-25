@@ -1,0 +1,59 @@
+name: Scan4Learn
+options:
+  bundleIdPrefix: com.scan4learn
+  developmentLanguage: en
+  deploymentTarget:
+    iOS: '27.0'
+  xcodeVersion: '27.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    TARGETED_DEVICE_FAMILY: '1'
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+    MARKETING_VERSION: '0.3.0'
+    CURRENT_PROJECT_VERSION: '1'
+packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    exactVersion: 0.9.19
+targets:
+  Scan4Learn:
+    type: application
+    platform: iOS
+    sources: [Scan4Learn]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.scan4learn.personal
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Scan4Learn
+        INFOPLIST_KEY_NSCameraUsageDescription: Scan your notes to recognize text and keep the lesson in your library.
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+    dependencies:
+      - package: ZIPFoundation
+    info:
+      path: Scan4Learn/Info.plist
+      properties:
+        # The ChatGPT OAuth flow redirects the in-app browser to the plain-HTTP
+        # loopback callback; allow local network loads so nothing blocks it.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+  Scan4LearnTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Scan4LearnTests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Scan4Learn
+schemes:
+  Scan4Learn:
+    build:
+      targets:
+        Scan4Learn: all
+    test:
+      targets: [Scan4LearnTests]
